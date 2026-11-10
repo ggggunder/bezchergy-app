@@ -167,7 +167,7 @@
 
   @media (prefers-reduced-motion:no-preference){
     .screen.anim{animation:in .22s ease-out}
-    @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    @keyframes in{from{transform:translateY(8px)}to{transform:none}}
   }
 </style>
 </head>
@@ -188,11 +188,14 @@
 <div class="dock" id="dock" hidden><button class="btn" id="dockBtn"><span class="n" id="dockN"></span><span>Кошик</span><span class="sum" id="dockSum"></span></button></div>
 
 <script>
-const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
-try { tg?.setHeaderColor?.("#0B2422"); tg?.setBackgroundColor?.("#050C0B"); } catch(e){}
+const tg = window.Telegram?.WebApp;
+// Деякі версії Telegram кидають помилку на непідтримувані функції — кожен виклик ізольовано
+const safe = fn => { try { return fn(); } catch(e){ console.warn("tg:", e && e.message); } };
+safe(() => tg?.ready()); safe(() => tg?.expand());
+safe(() => tg?.setHeaderColor?.("#0B2422")); safe(() => tg?.setBackgroundColor?.("#050C0B"));
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const hap = t => tg?.HapticFeedback?.impactOccurred?.(t || "light");
+const hap = t => safe(() => tg?.HapticFeedback?.impactOccurred?.(t || "light"));
 const money = v => `${v} ₴`;
 
 // ---------- дані: від бота в адресі (#d=base64url JSON), інакше демо ----------
@@ -269,7 +272,7 @@ function go(name, params={}, push=true){
   render(); window.scrollTo({top:0});
 }
 function back(){ route = history_.pop() || {name:"home"}; render(); }
-tg?.BackButton?.onClick?.(back);
+safe(() => tg?.BackButton?.onClick?.(back));
 $("#backBtn").onclick = back;
 document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => { history_ = []; go(b.dataset.go, {}, false); });
 $("#dockBtn").onclick = () => go("cart");
@@ -277,7 +280,7 @@ $("#dockBtn").onclick = () => go("cart");
 function chrome(){
   const sub = route.name === "cat";
   $("#backBtn").hidden = route.name === "home";
-  if (tg?.BackButton) route.name === "home" ? tg.BackButton.hide() : tg.BackButton.show();
+  safe(() => { if (tg?.BackButton) route.name === "home" ? tg.BackButton.hide() : tg.BackButton.show(); });
   document.querySelectorAll("[data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === (sub ? "home" : route.name)));
   const n = count();
   $("#navBadge").hidden = !n; $("#navBadge").textContent = n;
@@ -366,6 +369,11 @@ const S = {
 
 let lastKey = "";
 function render(){
+  try { renderInner(); } catch(e){
+    $("#screen").innerHTML = `<div class="card empty" style="margin-top:20px">Щось пішло не так 😔<br><small>${esc(e && e.message)}</small><br><br>Закрийте й відкрийте меню ще раз.</div>`;
+  }
+}
+function renderInner(){
   const html = (S[route.name] || S.home)(route);
   const key = route.name + ":" + (route.id || "");
   $("#screen").innerHTML = `<div class="screen ${key !== lastKey ? "anim" : ""}">${html}</div>`;
@@ -388,8 +396,11 @@ function bind(){
   const ord = $("#orderBtn");
   if (ord) ord.onclick = () => {
     const payload = JSON.stringify({v:1, c:[...cart], ts:slot[0]});
-    tg?.HapticFeedback?.notificationOccurred?.("success");
-    if (tg?.sendData && !DEMO) tg.sendData(payload);
+    safe(() => tg?.HapticFeedback?.notificationOccurred?.("success"));
+    if (tg?.sendData && !DEMO){
+      try { tg.sendData(payload); }
+      catch(e){ ord.textContent = "Не вдалося надіслати: " + (e && e.message); }
+    }
     else { ord.textContent = "Демо: замовлення сформовано ✓"; ord.disabled = true; }
   };
 }
