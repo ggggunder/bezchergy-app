@@ -227,6 +227,9 @@ D.slots = (D.slots || [[],[]]).map(day => day.map(s => s.length === 2
 const ITEMS = Object.fromEntries(D.items.map(([id,cat,name,desc,price,photo]) => [id,{id,cat,name,desc,price,photo}]));
 const CATS = D.cats.filter(c => D.items.some(i => i[1] === c[0]));
 const cart = new Map();
+let giftId = null;  // обраний подарунок (кава/чай) — коли картка заповнена
+const GIFT_OK = D.stamps >= D.goal;
+const GIFTS = (D.giftOpts || []).filter(id => ITEMS[id]);
 let day = (D.slots[0] || []).length ? 0 : 1, slot = null;
 let route = {name:"home"}, history_ = [];
 
@@ -257,11 +260,10 @@ function dm(text, px=5, color){
 }
 
 // ---------- розрахунки ----------
-const count = () => [...cart.values()].reduce((a,b)=>a+b,0);
+const count = () => [...cart.values()].reduce((a,b)=>a+b,0) + (giftId ? 1 : 0);
 function totals(){
   const sub = [...cart].reduce((s,[id,q]) => s + ITEMS[id].price*q, 0);
-  const gift = D.stamps >= D.goal && cart.size ? Math.min(...[...cart.keys()].map(id => ITEMS[id].price)) : 0;
-  return {sub, gift, total: sub - gift};
+  return {sub, total: sub};
 }
 const nearest = () => D.slots[0][0]?.[1] || (D.slots[1][0] ? `завтра ${D.slots[1][0][1]}` : "—");
 
@@ -279,9 +281,10 @@ $("#dockBtn").onclick = () => go("cart");
 
 function chrome(){
   const sub = route.name === "cat";
+  const onCard = route.name === "gift";
   $("#backBtn").hidden = route.name === "home";
   safe(() => { if (tg?.BackButton) route.name === "home" ? tg.BackButton.hide() : tg.BackButton.show(); });
-  document.querySelectorAll("[data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === (sub ? "home" : route.name)));
+  document.querySelectorAll("[data-go]").forEach(b => b.classList.toggle("on", b.dataset.go === (sub ? "home" : onCard ? "card" : route.name)));
   const n = count();
   $("#navBadge").hidden = !n; $("#navBadge").textContent = n;
   $("#dock").hidden = !n || route.name === "cart" || D.open === false;
@@ -333,14 +336,16 @@ const S = {
             : `<button class="plus" data-ci="${iid}" data-d="1" aria-label="Додати ${esc(n)}" ${D.open===false?"disabled":""}>+</button>`}</span></div>`;}).join("")}</div>`;
   },
   cart(){
-    if (!cart.size) return `<h1>Кошик</h1><div class="card empty">Тут поки порожньо.<br><br><button class="ghost" data-goto="home">Перейти до меню</button></div>`;
+    if (!cart.size && !giftId) return `<h1>Кошик</h1><div class="card empty">Тут поки порожньо.<br><br><button class="ghost" data-goto="home">Перейти до меню</button>
+      ${GIFT_OK && GIFTS.length ? `<br><br><button class="btn green" data-goto="gift">🎁 Забрати подарунок</button>` : ""}</div>`;
     const t = totals(), list = D.slots[day] || [];
     return `<h1>Кошик</h1><p class="sub">Перевірте й оберіть час</p>
       <div class="stack">
         <div class="card">${[...cart].map(([id,q]) => `<div class="line"><span class="nm">${esc(ITEMS[id].name)}</span>
             <span class="stepper"><button data-ci="${id}" data-d="-1" aria-label="Менше">−</button><span>${q}</span><button data-ci="${id}" data-d="1" aria-label="Більше">+</button></span>
             <span class="price" style="min-width:64px;text-align:right">${money(ITEMS[id].price*q)}</span></div>`).join("")}
-          ${t.gift ? `<div class="gift">🎁 Подарунок за картку гостя: −${money(t.gift)}</div>` : ""}
+          ${giftId ? `<div class="line"><span class="nm">🎁 ${esc(ITEMS[giftId].name)}</span><button class="ghost" data-goto="gift" style="padding:6px 12px">змінити</button><span class="price" style="min-width:64px;text-align:right">подарунок</span></div>`
+            : (GIFT_OK && GIFTS.length ? `<div class="line"><span class="nm" style="color:var(--copper)">🎁 Вам доступний подарунок</span><button class="ghost" data-goto="gift" style="padding:6px 12px">обрати</button></div>` : "")}
           <div class="totals" style="margin-top:14px"><span class="lbl">Разом</span>${dm(t.total, 5, "#E3A867")}</div>
         </div>
         <div class="card">
@@ -356,14 +361,25 @@ const S = {
         <button class="btn green" id="orderBtn" ${!slot||D.open===false?"disabled":""}>${slot ? `Замовити на ${slot[2]?"завтра ":""}${slot[1]}` : "Оберіть час"}<span class="sum">${money(t.total)}</span></button>
       </div>`;
   },
+  gift(){
+    return `<h1>Ваш подарунок</h1><p class="sub">Оберіть будь-яку каву чи чай — це від нас 💚</p>
+      <div class="stack">${GIFTS.map(id => { const it = ITEMS[id]; const on = giftId === id;
+        return `<button class="card item ${on?"in-cart":""}" data-gift="${id}" style="text-align:left">
+          <span class="thumb">${artFor(it.cat)}</span>
+          <span class="t"><b>${esc(it.name)}</b><small>${esc(it.desc)}</small></span>
+          <span class="side"><span class="price" style="text-decoration:line-through;opacity:.6">${money(it.price)}</span>
+            <span class="${on?"plus":"ghost"}" style="${on?"":"padding:8px 12px"}">${on?"✓":"Обрати"}</span></span></button>`;}).join("")}</div>`;
+  },
   card(){
     const n = Math.min(D.stamps, D.goal);
     return `<h1>Картка гостя</h1><p class="sub">Кожне видане замовлення — штамп</p>
       <div class="card hero">
         <div class="row"><span class="ico">${I.gift}</span></div>
-        <div class="big" style="margin-top:16px">${dm(`${n}`, 7, "#8EF0B0")}<div class="meta">з ${D.goal}<br>${n >= D.goal ? "наступна позиція — у подарунок 🎁" : `ще ${D.goal-n} — і кава в подарунок`}</div></div>
+        <div class="big" style="margin-top:16px">${dm(`${n}`, 7, "#8EF0B0")}<div class="meta">з ${D.goal}<br>${n >= D.goal ? "картка заповнена — оберіть подарунок 🎁" : `ще ${D.goal-n} — і кава чи чай у подарунок`}</div></div>
         <div class="stamps">${Array.from({length:D.goal},(_,i)=>`<i class="${i<n?"on":""}">${i===D.goal-1?"🎁":i<n?"☕":""}</i>`).join("")}</div>
-      </div>`;
+      </div>
+      ${GIFT_OK && GIFTS.length ? `<div style="height:12px"></div><button class="btn green" data-goto="gift">🎁 Забрати подарунок</button>
+        <p class="hint" style="text-align:center">Кава чи чай на ваш вибір — безкоштовно</p>` : ""}`;
   },
 };
 
@@ -383,6 +399,9 @@ function renderInner(){
 function bind(){
   document.querySelectorAll("[data-cat]").forEach(b => b.onclick = () => { hap(); go("cat",{id:+b.dataset.cat}); });
   document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => go(b.dataset.goto));
+  document.querySelectorAll("[data-gift]").forEach(b => b.onclick = () => {
+    giftId = +b.dataset.gift; safe(() => tg?.HapticFeedback?.notificationOccurred?.("success")); go("cart");
+  });
   const rep = $("#repeat");
   if (rep) rep.onclick = () => { cart.clear(); (D.last||[]).forEach(([id,q]) => ITEMS[id] && cart.set(id,q)); hap("medium"); go("cart"); };
   document.querySelectorAll("[data-ci]").forEach(b => b.onclick = () => {
@@ -395,7 +414,7 @@ function bind(){
   document.querySelectorAll("[data-ts]").forEach(b => b.onclick = () => { slot = [+b.dataset.ts, b.dataset.l, day]; hap(); render(); });
   const ord = $("#orderBtn");
   if (ord) ord.onclick = () => {
-    const payload = JSON.stringify({v:1, c:[...cart], ts:slot[0]});
+    const payload = JSON.stringify({v:1, c:[...cart], ts:slot[0], g:giftId || 0});
     safe(() => tg?.HapticFeedback?.notificationOccurred?.("success"));
     if (tg?.sendData && !DEMO){
       try { tg.sendData(payload); }
