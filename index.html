@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Без Черги</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --wall:#0F3F3C; --wall-2:#155552; --deep:#082624;
+    --copper:#C9874A; --brass:#E3A867; --lamp:#FFD08A; --cream:#F1E8DA; --hint:#9DB3AE;
+    --copper-line:linear-gradient(135deg,#F0C08A,#B8743A 45%,#7A4520 70%,#E3A867);
+    --glass:linear-gradient(180deg,rgba(32,112,105,.42) 0%,rgba(14,62,58,.55) 45%,rgba(6,30,28,.72) 100%);
+    --pad:16px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  [hidden]{display:none!important}
+  html{background:var(--deep)}
+  body{margin:0;min-height:100vh;color:var(--cream);font:15px/1.45 Onest,-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;
+    background:linear-gradient(180deg,var(--wall) 0%,#0D3735 55%,var(--deep) 100%) fixed;padding-bottom:110px}
+  button{font:inherit;color:inherit}
+  :focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+
+  /* ---- лампи: єдиний «гучний» елемент ---- */
+  .ceiling{position:relative;height:150px;overflow:hidden;pointer-events:none}
+  .lamp{position:absolute;top:0;width:2px;background:#C9874A99}
+  .lamp i{position:absolute;left:50%;bottom:0;transform:translate(-50%,50%);border-radius:50%;
+    background:radial-gradient(circle at 42% 40%,#FFF4DC 0 18%,#FFD08A 32%,rgba(255,184,92,.28) 62%,rgba(227,168,103,.15) 100%);
+    box-shadow:0 0 0 1.5px #E3A867aa inset,0 0 38px 10px #FFC8774d,0 0 120px 40px #FFC8771f}
+  .lamp i:before{content:"";position:absolute;left:50%;top:-7px;width:12px;height:9px;transform:translateX(-50%);border-radius:2px;background:var(--brass)}
+  @media (prefers-reduced-motion:no-preference){
+    .lamp{animation:sway 7s ease-in-out infinite alternate;transform-origin:top center}
+    .lamp:nth-child(2){animation-duration:9s}.lamp:nth-child(3){animation-duration:8s}
+    @keyframes sway{from{transform:rotate(-1.2deg)}to{transform:rotate(1.2deg)}}
+  }
+  header{padding:0 var(--pad);margin-top:-86px;position:relative}
+  h1{margin:0;font-size:34px;font-weight:700;letter-spacing:-.8px;line-height:1.1}
+  .status{display:flex;align-items:center;gap:10px;margin-top:6px;color:var(--hint);font-size:14px}
+  .status b{color:var(--lamp);font-weight:600}
+  .dot{width:8px;height:8px;border-radius:50%;background:#7BD88F;box-shadow:0 0 10px #7BD88F}
+  .stamp{margin-left:auto;font-size:13px;color:var(--brass);white-space:nowrap}
+
+  /* ---- скляна кнопка з мідною обводкою (запит клієнта) ---- */
+  /* скло: прозорий смарагдовий градієнт; мідна обводка окремим шаром, щоб не просвічувала крізь скло */
+  .g{position:relative;border:0;border-radius:16px;background:var(--glass);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:inset 0 1px 0 #ffffff1a,0 8px 22px #0005;cursor:pointer}
+  .g::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;background:var(--copper-line);pointer-events:none;
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+  .g:active{transform:scale(.98)}
+  .cu{border:1px solid #F0C08A;background:linear-gradient(180deg,#F3C793,#C9874A 55%,#99602F);color:#2A1608;
+    box-shadow:inset 0 1px 0 #fff7,0 10px 26px #C9874A40;font-weight:700;cursor:pointer}
+  .cu:active{transform:scale(.98)}
+
+  .repeat{display:flex;align-items:center;gap:12px;width:calc(100% - 2*var(--pad));margin:18px var(--pad) 0;padding:12px 14px;text-align:left}
+  .repeat .ic{font-size:20px}
+  .repeat .t{flex:1;min-width:0}
+  .repeat .t small{display:block;color:var(--hint);font-size:12px}
+  .repeat .t span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+  .repeat .p{color:var(--lamp);font-weight:700}
+
+  .tabs{display:flex;gap:8px;overflow-x:auto;padding:16px var(--pad) 6px;scrollbar-width:none;position:sticky;top:0;z-index:5;
+    background:linear-gradient(180deg,#0F3F3Cf2 70%,#0F3F3C00)}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:none;padding:9px 16px;border-radius:999px;font-weight:600;font-size:14px;white-space:nowrap}
+  .tab.on{border:1px solid #F0C08A;background:linear-gradient(180deg,#F3C793,#C9874A 60%,#99602F);color:#2A1608;box-shadow:inset 0 1px 0 #fff7}
+
+  section{padding:6px var(--pad) 4px}
+  h2{font-size:20px;font-weight:700;margin:18px 2px 10px;letter-spacing:-.3px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .item{position:relative;border-radius:20px;padding:0 0 12px;overflow:hidden;cursor:default}
+  .art{height:104px;display:grid;place-items:center;background:radial-gradient(120px 80px at 50% 30%,#FFC87733,transparent 70%)}
+  .art svg{width:66px;height:66px}
+  .art img{width:100%;height:104px;object-fit:cover}
+  .item .n{padding:0 12px;font-weight:600;font-size:15px;line-height:1.25}
+  .item .d{padding:2px 12px 0;color:var(--hint);font-size:12px;min-height:16px}
+  .item .row{display:flex;align-items:center;justify-content:space-between;padding:10px 10px 0 12px}
+  .price{font-weight:700;color:var(--lamp)}
+  .add{width:36px;height:36px;border-radius:12px;font-size:20px;line-height:1;display:grid;place-items:center;padding:0}
+  .qty{display:flex;align-items:center;gap:2px;border-radius:12px;padding:2px}
+  .qty button{width:30px;height:32px;border:0;background:none;font-size:18px;cursor:pointer}
+  .qty span{min-width:18px;text-align:center;font-weight:700}
+
+  /* ---- нижня панель кошика ---- */
+  .bar{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;
+    gap:12px;padding:14px 18px;border-radius:20px;font-size:16px;width:auto}
+  .bar .c{width:28px;height:28px;border-radius:50%;background:#2A16081f;display:grid;place-items:center;font-size:14px}
+  .bar .s{flex:1;text-align:left}
+  .bar.bump{animation:bump .25s}
+  @keyframes bump{50%{transform:scale(1.03)}}
+
+  /* ---- шторка оформлення ---- */
+  .sheet{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;justify-content:flex-end;background:#04161599;backdrop-filter:blur(3px)}
+  .panel{max-height:88vh;overflow:auto;border-radius:26px 26px 0 0;padding:10px var(--pad) calc(20px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,#155552,#0B2F2D 40%,#082624);border-top:1px solid #E3A86799;box-shadow:0 -10px 40px #0008}
+  .grab{width:44px;height:5px;border-radius:3px;background:#E3A86766;margin:4px auto 12px}
+  .line{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #E3A86722}
+  .line .nm{flex:1}
+  .line .sum{min-width:64px;text-align:right;font-weight:600}
+  .gift{color:var(--brass);font-size:14px;padding:10px 0}
+  .total{display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding:14px 0 4px}
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;border-radius:16px;margin:16px 0 12px}
+  .seg button{border:0;background:none;padding:9px;border-radius:12px;font-weight:600;cursor:pointer;color:var(--hint)}
+  .seg button.on{background:linear-gradient(180deg,#F3C793,#C9874A 60%,#99602F);color:#2A1608}
+  .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .slot{padding:10px 0;border-radius:12px;text-align:center;font-weight:600;font-size:14px}
+  .slot.on{background:linear-gradient(180deg,#F3C793,#C9874A 60%,#99602F);color:#2A1608}
+  .slot small{display:block;font-size:10px;font-weight:500;color:var(--brass)}
+  .slot.on small{color:#2A1608aa}
+  .note{color:var(--hint);font-size:13px;margin:12px 2px 0}
+  .order{width:100%;margin-top:18px;padding:16px;border-radius:18px;font-size:16px}
+  .order:disabled{filter:grayscale(.6) brightness(.8);cursor:default}
+</style>
+</head>
+<body>
+<div class="ceiling" aria-hidden="true">
+  <div class="lamp" style="left:58%;height:62px"><i style="width:46px;height:46px"></i></div>
+  <div class="lamp" style="left:76%;height:96px"><i style="width:38px;height:38px"></i></div>
+  <div class="lamp" style="left:90%;height:44px"><i style="width:28px;height:28px"></i></div>
+</div>
+<header>
+  <h1>Без Черги</h1>
+  <div class="status"><span class="dot"></span><span id="status"></span><span class="stamp" id="stamp"></span></div>
+</header>
+<button class="g repeat" id="repeat" hidden>
+  <span class="ic">🔁</span><span class="t"><small>Як минулого разу</small><span id="repeatTxt"></span></span><span class="p" id="repeatSum"></span>
+</button>
+<nav class="tabs" id="tabs"></nav>
+<main id="menu"></main>
+
+<button class="cu bar" id="bar" hidden><span class="c" id="barCount"></span><span class="s">Обрати час</span><span id="barSum"></span></button>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="panel" role="dialog" aria-label="Ваше замовлення">
+    <div class="grab"></div>
+    <h2 style="margin-top:0">Ваше замовлення</h2>
+    <div id="lines"></div>
+    <div class="g seg" style="cursor:default"><button data-day="0" class="on">Сьогодні</button><button data-day="1">Завтра</button></div>
+    <div class="slots" id="slots"></div>
+    <p class="note" id="note"></p>
+    <button class="cu order" id="order" disabled>Оберіть час</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp; tg?.ready(); tg?.expand();
+try { tg?.setHeaderColor?.("#0F3F3C"); tg?.setBackgroundColor?.("#082624"); } catch(e){}
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const hap = t => tg?.HapticFeedback?.impactOccurred?.(t || "light");
+
+// Дані приходять від бота в адресі сторінки (#d=base64url(JSON)); нижче — демо для перегляду
+function load(){
+  const m = location.hash.match(/d=([^&]+)/);
+  if (m) try {
+    const b = m[1].replace(/-/g,"+").replace(/_/g,"/");
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b), c => c.charCodeAt(0))));
+  } catch(e){}
+  const t = new Date(), mk = (h,mi,d=0) => { const x = new Date(t); x.setDate(x.getDate()+d); x.setHours(h,mi,0,0); return [Math.floor(x/1000), `${String(h).padStart(2,"0")}:${String(mi).padStart(2,"0")}`, 4]; };
+  return {
+    q: 2, stamps: 4, goal: 6,
+    cats: [[1,"Кава","coffee"],[2,"Чай та інше","tea"],[3,"Випічка","bakery"],[4,"Десерти","dessert"],[5,"Сендвічі","sandwich"]],
+    items: [[1,1,"Еспресо","Подвійний шот",45],[2,1,"Американо","250 мл",55],[3,1,"Капучино","250 мл",70],[4,1,"Лате","350 мл",75],[5,1,"Флет вайт","Подвійний шот",80],
+            [6,2,"Чай","Чорний або зелений",50],[7,2,"Какао","300 мл",65],[8,2,"Матча лате","300 мл",90],
+            [9,3,"Круасан","Вершковий",60],[10,3,"Сирник","Зі сметаною",75],
+            [11,4,"Чізкейк","Класичний",95],[12,4,"Макарон","1 шт",40],[13,4,"Тірамісу","Порція",110],
+            [14,5,"Сендвіч з куркою","Курка, салат, соус",135],[15,5,"Сендвіч з лососем","Лосось, крем-сир",165],[16,5,"Тост з сиром","Гарячий",90]],
+    last: [[3,2],[9,1]],
+    slots: [[mk(15,45),mk(15,50),mk(15,55),mk(16,0),mk(16,5),mk(16,10),mk(16,15),mk(16,20)].map((s,i)=> i===1 ? [s[0],s[1],1] : s),
+            [mk(8,0,1),mk(8,5,1),mk(8,10,1),mk(8,15,1),mk(8,20,1),mk(8,25,1),mk(8,30,1),mk(8,35,1)]]
+  };
+}
+const D = load();
+// слоти від бота приходять як [ts, вільно]; підпис часу рахуємо на телефоні
+D.slots = (D.slots || [[],[]]).map(day => day.map(s => s.length === 2
+  ? [s[0], new Date(s[0]*1000).toLocaleTimeString("uk-UA",{hour:"2-digit",minute:"2-digit"}), s[1]] : s));
+const DEMO = !/d=/.test(location.hash);
+const ITEMS = Object.fromEntries(D.items.map(([id,cat,name,desc,price,photo]) => [id,{id,cat,name,desc,price,photo}]));
+const cart = new Map();
+let day = (D.slots[0] || []).length ? 0 : 1, slot = null;
+
+// Ілюстрації категорій (ті самі мотиви, що й у картинках бота)
+const ART = {
+  coffee:'<svg viewBox="0 0 64 64"><path d="M14 26h30v8c0 9-7 15-15 15s-15-6-15-15z" fill="#F1E8DA"/><path d="M44 29h3c4 0 7 3 7 6s-3 7-7 7h-4" fill="none" stroke="#F1E8DA" stroke-width="3.5"/><path d="M17 28h24v3c0 1-1 2-2 2H19c-1 0-2-1-2-2z" fill="#C9874A"/><rect x="10" y="52" width="40" height="3.5" rx="1.75" fill="#C9874A"/><path d="M24 8l6 6-6 6M32 8l6 6-6 6" fill="none" stroke="#FFD08A" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  tea:'<svg viewBox="0 0 64 64"><path d="M22 6c-4 4 4 7 0 12M32 4c-4 4 4 7 0 12M42 6c-4 4 4 7 0 12" fill="none" stroke="#FFD08A" stroke-width="3" stroke-linecap="round"/><path d="M6 26h52c0 15-12 25-26 25S6 41 6 26z" fill="#F1E8DA"/><ellipse cx="32" cy="26.5" rx="25" ry="3.5" fill="#8CCB6B"/><rect x="20" y="52" width="24" height="3.5" rx="1.75" fill="#C9874A"/></svg>',
+  bakery:'<svg viewBox="0 0 64 64"><path d="M4 42C6 26 20 18 32 18s26 8 28 24c-7-3-13-3-15-1-2-6-7-9-13-9s-11 3-13 9c-2-2-8-2-15 1z" fill="#C9874A"/><path d="M19 41c1-10 7-15 13-15s12 5 13 15" fill="none" stroke="#8E5428" stroke-width="2.5"/><path d="M26 39c1-8 3-10 6-10s5 2 6 10" fill="none" stroke="#8E5428" stroke-width="2.5"/><rect x="10" y="50" width="44" height="3.5" rx="1.75" fill="#FFD08A"/></svg>',
+  dessert:'<svg viewBox="0 0 64 64"><path d="M8 48h48V26L8 36z" fill="#F1E8DA"/><path d="M8 36l48-10v4L8 40z" fill="#C9874A"/><path d="M8 44h48" stroke="#C9874A" stroke-width="2"/><circle cx="46" cy="20" r="5" fill="#E0566B"/><rect x="6" y="51" width="52" height="3.5" rx="1.75" fill="#FFD08A"/></svg>',
+  default:'<svg viewBox="0 0 64 64"><path d="M32 8l6 18 18 6-18 6-6 18-6-18-18-6 18-6z" fill="#FFD08A"/></svg>',
+  sandwich:'<svg viewBox="0 0 64 64"><path d="M6 26Q32 10 58 26z" fill="#C9874A"/><path d="M5 27q5-3 9 0t9 0 9 0 9 0 9 0 9 0v3H5z" fill="#8CCB6B"/><rect x="6" y="30" width="52" height="5" rx="2" fill="#E0566B"/><rect x="5" y="35" width="54" height="4" rx="2" fill="#F2C94C"/><rect x="6" y="39" width="52" height="10" rx="4" fill="#C9874A"/><rect x="10" y="53" width="44" height="3.5" rx="1.75" fill="#FFD08A"/></svg>',
+};
+const catOf = id => D.cats.find(c => c[0] === id);
+const money = v => `${v} ₴`;
+
+function header(){
+    const near = D.slots[0][0]?.[1] ? `найближче <b>${D.slots[0][0][1]}</b>` : "сьогодні вже все — замовляйте на завтра";
+  $("#status").innerHTML = D.q ? `У роботі <b>${D.q}</b> · ${near}` : `Зараз без черги · ${near}`;
+  $("#stamp").textContent = `🎁 ${Math.min(D.stamps, D.goal)} з ${D.goal}`;
+  const last = (D.last || []).filter(([id]) => ITEMS[id]);
+  if (last.length){
+    $("#repeat").hidden = false;
+    $("#repeatTxt").textContent = last.map(([id,q]) => ITEMS[id].name + (q > 1 ? ` ×${q}` : "")).join(" + ");
+    $("#repeatSum").textContent = money(last.reduce((s,[id,q]) => s + ITEMS[id].price*q, 0));
+    $("#repeat").onclick = () => { cart.clear(); last.forEach(([id,q]) => cart.set(id,q)); hap("medium"); render(); openSheet(); };
+  }
+}
+
+function render(){
+  $("#tabs").innerHTML = D.cats.filter(c => D.items.some(i => i[1] === c[0]))
+    .map(([id,name]) => `<button class="g tab" data-c="${id}">${esc(name)}</button>`).join("");
+  $("#menu").innerHTML = D.cats.map(([cid,name,kind]) => {
+    const its = D.items.filter(i => i[1] === cid);
+    if (!its.length) return "";
+    return `<section id="c${cid}"><h2>${esc(name)}</h2><div class="grid">${its.map(([id,,n,d,p,photo]) => {
+      const q = cart.get(id) || 0;
+      return `<article class="g item">
+        <div class="art">${photo ? `<img src="${esc(photo)}" alt="">` : ART[kind] || ART.coffee}</div>
+        <div class="n">${esc(n)}</div><div class="d">${esc(d)}</div>
+        <div class="row"><span class="price">${money(p)}</span>${q
+          ? `<span class="g qty"><button data-dec="${id}" aria-label="Менше">−</button><span>${q}</span><button data-inc="${id}" aria-label="Більше">+</button></span>`
+          : `<button class="cu add" data-inc="${id}" aria-label="Додати ${esc(n)}">+</button>`}</div>
+      </article>`;}).join("")}</div></section>`;
+  }).join("");
+  document.querySelectorAll("[data-inc]").forEach(b => b.onclick = () => { cart.set(+b.dataset.inc, (cart.get(+b.dataset.inc)||0)+1); hap(); render(); bump(); });
+  document.querySelectorAll("[data-dec]").forEach(b => b.onclick = () => { const id=+b.dataset.dec, q=(cart.get(id)||0)-1; q>0?cart.set(id,q):cart.delete(id); hap(); render(); });
+  document.querySelectorAll("[data-c]").forEach(b => b.onclick = () => document.getElementById("c"+b.dataset.c).scrollIntoView({behavior:"smooth",block:"start"}));
+  spy();
+  const n = [...cart.values()].reduce((a,b)=>a+b,0);
+  $("#bar").hidden = !n;
+  $("#barCount").textContent = n;
+  $("#barSum").textContent = money(totals().total);
+}
+function bump(){ const b=$("#bar"); b.classList.remove("bump"); void b.offsetWidth; b.classList.add("bump"); }
+function totals(){
+  const sub = [...cart].reduce((s,[id,q]) => s + ITEMS[id].price*q, 0);
+  const gift = D.stamps >= D.goal && cart.size ? Math.min(...[...cart.keys()].map(id => ITEMS[id].price)) : 0;
+  return {sub, gift, total: sub - gift};
+}
+// підсвічування активної вкладки під час прокрутки
+function spy(){
+  const secs = [...document.querySelectorAll("section")];
+  const on = () => {
+    let cur = secs[0]?.id;
+    for (const s of secs) if (s.getBoundingClientRect().top < 140) cur = s.id;
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", "c"+t.dataset.c === cur));
+  };
+  window.onscroll = on; on();
+}
+
+function openSheet(){
+  const t = totals();
+  $("#lines").innerHTML = [...cart].map(([id,q]) => `<div class="line"><span class="nm">${esc(ITEMS[id].name)}</span>
+      <span class="g qty"><button data-sdec="${id}" aria-label="Менше">−</button><span>${q}</span><button data-sinc="${id}" aria-label="Більше">+</button></span>
+      <span class="sum">${money(ITEMS[id].price*q)}</span></div>`).join("")
+    + (t.gift ? `<div class="gift">🎁 Подарунок за картку гостя: −${money(t.gift)}</div>` : "")
+    + `<div class="total"><span>Разом</span><span>${money(t.total)}</span></div>`;
+  document.querySelectorAll("[data-sinc]").forEach(b => b.onclick = () => { cart.set(+b.dataset.sinc, cart.get(+b.dataset.sinc)+1); render(); openSheet(); });
+  document.querySelectorAll("[data-sdec]").forEach(b => b.onclick = () => { const id=+b.dataset.sdec, q=cart.get(id)-1; q>0?cart.set(id,q):cart.delete(id); render(); cart.size ? openSheet() : closeSheet(); });
+  renderSlots();
+  $("#sheet").hidden = false;
+}
+function closeSheet(){ $("#sheet").hidden = true; }
+function renderSlots(){
+  document.querySelectorAll(".seg button").forEach(b => b.classList.toggle("on", +b.dataset.day === day));
+  const list = D.slots[day] || [];
+  $("#slots").innerHTML = list.length ? list.map(([ts,l,free]) =>
+    `<button class="g slot ${slot?.[0]===ts?"on":""}" data-ts="${ts}" data-l="${l}">${l}${free===1?"<small>1 місце</small>":""}</button>`).join("")
+    : `<p class="note" style="grid-column:1/-1">На цей день вільного часу немає.</p>`;
+  document.querySelectorAll("[data-ts]").forEach(b => b.onclick = () => { slot=[+b.dataset.ts,b.dataset.l,day]; hap(); renderSlots(); });
+  $("#note").textContent = "Приготуємо саме до цього часу. Оплата при отриманні.";
+  const o = $("#order");
+  o.disabled = !slot || !cart.size;
+  o.textContent = slot ? `Замовити на ${slot[2] ? "завтра " : ""}${slot[1]} · ${money(totals().total)}` : "Оберіть час";
+}
+document.querySelectorAll(".seg button").forEach(b => b.onclick = () => { day=+b.dataset.day; renderSlots(); });
+$("#bar").onclick = openSheet;
+$("#sheet").onclick = e => { if (e.target.id === "sheet") closeSheet(); };
+$("#order").onclick = () => {
+  const payload = JSON.stringify({v:1, c:[...cart], ts:slot[0]});
+  tg?.HapticFeedback?.notificationOccurred?.("success");
+  if (tg?.sendData) tg.sendData(payload); else alert("Демо: " + payload);
+};
+if (DEMO && tg?.initData){
+  document.body.innerHTML = '<p style="padding:40px 24px;text-align:center;color:#9DB3AE">Відкрийте меню кнопкою «☕ Меню» в чаті з ботом.</p>';
+} else if (D.open === false){
+  header(); render();
+  $("#bar").remove();
+  $("#status").textContent = "Зараз замовлення на паузі — загляньте трохи пізніше";
+} else { header(); render(); }
+</script>
+</body>
+</html>
